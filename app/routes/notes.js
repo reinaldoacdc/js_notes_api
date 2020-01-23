@@ -28,6 +28,58 @@ router.post('/', withAuth, async function(req, res) {
     }
 });
 
+router.get('/', withAuth, async function(req, res) {
+    try {
+        let notes = await Note.find({author: req.user._id })
+        res.send(notes)
+    } catch (error) {
+        res.json({error: error}).status(500)
+    }    
+});
+
+router.put('/:id', withAuth, async function(req, res) {
+    const { title, body } = req.body;
+    const { id } = req.params;    
+    try {
+        var note = await Note.findOneAndUpdate(
+            {_id: id}, 
+            { $set: { title: title, body: body}}, 
+            { upsert: true, 'new': true }
+          )
+        res.json(note);
+    } catch (err) {
+      res.status(500).send(err);
+    }    
+});
+
+router.delete('/:id', withAuth, async function(req, res) {
+    const { id } = req.params;
+    try {
+        let note = await Note.findById(id);
+        if(note && is_owner(req.user, note)){
+            await note.delete();
+            res.json({message: 'OK'}).status(204);
+        }else{
+          res.json({error: 'Forbidden'}).status(403);
+        }        
+    } catch (err) {
+      res.status(500).send(err);
+    }    
+});
+
+router.get('/search', withAuth, async function(req, res) {
+    const { query } = req.query;
+    try {
+        let notes = await Note
+        .find({author: req.user._id })
+        .find({$text: {$search: query}})
+
+        res.json(notes)
+    } catch (error) {
+      res.json({error: error}).status(500);
+    }    
+});
+
 const is_owner = (user, note) => {
     if(JSON.stringify(user._id) == JSON.stringify(note.author._id))
       return true;
